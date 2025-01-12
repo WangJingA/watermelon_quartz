@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.com.watermelon.watermelon_quartz.mapper.JobDetailOperationMapper">
+    <insert id="addJobUser">
+        insert into qrtz_user_job (job_name,group_name,user_id)values (#{jobName},#{jobGroup},#{userId})
+    </insert>
+
+    <insert id="addJobLogs">
+        insert into qrtz_logs (job_name,group_name,logs_msg,execute_state,execute_time)values (#{jobName},#{jobGroup},#{logMsg},#{executeState},#{executeTime})
+    </insert>
+    <insert id="addJobDetail" parameterType="org.com.watermelon.watermelon_quartz.entity.dto.AddQuartzJobDTO">
+        insert into qrtz_http_job_detail(job_name,job_group_name,job_http_url,job_http_param,job_description,job_http_way)
+        values
+            (#{jobName},#{jobGroup},#{requestMethod},#{jobDataMap},#{jobDescription},#{requestWay})
+    </insert>
+    <update id="updateJobDetail" parameterType="org.com.watermelon.watermelon_quartz.entity.dto.AddQuartzJobDTO">
+        update qrtz_http_job_detail set job_http_url = #{requestMethod},
+                                        job_http_param = #{jobDataMap},
+                                        job_description = #{jobDescription},
+                                        job_http_way = #{requestWay}
+        where job_name = #{jobName} and job_group_name = #{jobGroup}
+    </update>
+    <delete id="delUserJob">
+        delete from qrtz_user_job where job_name = #{jobName} and group_name = #{groupName}
+    </delete>
+
+    <select id="listJobDetail" resultType="org.com.watermelon.watermelon_quartz.entity.po.JobDetailPO">
+        select  		jobName,
+        jobDescription,
+        jobGroupName,
+        jobClassName,
+        triggerName,
+        triggerGroupName,
+        prevFireTime,
+        nextFireTime,
+        cronExpression,
+        triggerState,
+        u.user_id as userId
+        from (
+        SELECT
+        jd.JOB_NAME AS jobName,
+        jd.DESCRIPTION AS jobDescription,
+        jd.JOB_GROUP AS jobGroupName,
+        jd.JOB_CLASS_NAME AS jobClassName,
+        t.TRIGGER_NAME AS triggerName,
+        t.TRIGGER_GROUP AS triggerGroupName,
+        FROM_UNIXTIME(t.PREV_FIRE_TIME/1000,'%Y-%m-%d %T') AS prevFireTime,
+        FROM_UNIXTIME(t.NEXT_FIRE_TIME/1000,'%Y-%m-%d %T') AS nextFireTime,
+        ct.CRON_EXPRESSION AS cronExpression,
+        t.TRIGGER_STATE AS triggerState
+        FROM
+        QRTZ_JOB_DETAILS jd
+        JOIN QRTZ_TRIGGERS t
+        JOIN QRTZ_CRON_TRIGGERS ct
+        ON jd.JOB_NAME = t.JOB_NAME AND t.TRIGGER_NAME = ct.TRIGGER_NAME AND t.TRIGGER_GROUP = ct.TRIGGER_GROUP
+        ) job
+        left JOIN qrtz_user_job u
+        ON u.job_name = job.jobName AND u.group_name = job.jobGroupName
+        <if test="paramDTO != null">
+            <where>
+                <if test="paramDTO.getUserId() != null and paramDTO.getUserId() != ''">
+                    and user_id = #{paramDTO.userId}
+                </if>
+                <if test="paramDTO.getJobName() != null and paramDTO.getJobName() != ''">
+                    and job.jobName like concat('%',#{paramDTO.jobName},'%')
+                </if>
+                <if test="paramDTO.getJobGroupName() != null and paramDTO.getJobGroupName() != ''">
+                    and job.jobGroupName = #{paramDTO.jobGroupName}
+                </if>
+            </where>
+        </if>
+    </select>
+
+    <select id="listJobGroup" resultType="java.lang.String">
+        SELECT
+            DISTINCT jd.JOB_GROUP AS jobGroupName
+        FROM
+            QRTZ_JOB_DETAILS jd
+    </select>
+    <select id="jobTranState" resultType="org.com.watermelon.watermelon_quartz.entity.po.JobTranStatePO">
+        select schedule_state_en,schedule_state_cn from qrtz_schedule_tran_state
+    </select>
+    <select id="isExistJob" resultType="org.com.watermelon.watermelon_quartz.entity.po.UserJobPO" parameterType="org.com.watermelon.watermelon_quartz.entity.po.UserJobPO">
+        select job_name,group_name from qrtz_user_job where job_name = #{jobName} and group_name = #{jobGroup}
+    </select>
+
+    <select id="listHttpJobDetail"
+            resultType="org.com.watermelon.watermelon_quartz.entity.dto.JobHttpDetailDTO">
+        select job_name as jobName,
+               job_group_name as jobGroupName,
+               job_http_url as requestMethod,
+               job_http_param as requestParam,
+               job_description as description,
+               job_http_way as requestWay
+        from qrtz_http_job_detail
+    </select>
+    <select id="queryHttpJobDetail"
+            resultType="org.com.watermelon.watermelon_quartz.entity.dto.JobHttpDetailDTO">
+        select job_name as jobName,
+               job_group_name as jobGroupName,
+               job_http_url as requestMethod,
+               job_http_param as requestParam,
+               job_description as description,
+               job_http_way as requestWay
+        from qrtz_http_job_detail
+        where job_name = #{jobName} and job_group_name = #{jobGroupName}
+    </select>
+
+    <select id="jobExecuteLogs" resultType="org.com.watermelon.watermelon_quartz.entity.dto.JobExecuteLogsInfoDTO">
+        select
+        job_name as jobName,
+        group_name as jobGroupName,
+        logs_msg as logMsg,
+        execute_state as executeState,
+        DATE_FORMAT(execute_time,'%Y-%m-%d %H:%i:%s') AS executeTime,
+        case
+          when execute_state = '1' then '任务正常执行'
+          when execute_state = '0' then '执行出现错误'
+        end executeStateName
+        from
+        qrtz_logs
+        <if test="paramDTO != null">
+            <where>
+                <if test="paramDTO.getExecuteState() != null and paramDTO.getExecuteState() != ''">
+                   and execute_state = #{paramDTO.executeState}
+                </if>
+                <if test="paramDTO.getJobName() != null and paramDTO.getJobName() != ''">
+                    and job_name like concat('%',#{paramDTO.jobName},'%')
+                </if>
+                <if test="paramDTO.getJobGroupName() != null and paramDTO.getJobGroupName() != ''">
+                    and group_name = #{paramDTO.jobGroupName}
+                </if>
+                <if test="paramDTO.getJobLogKey() != null and paramDTO.getJobLogKey() != ''">
+                   and logs_msg like CONCAT('%',#{paramDTO.jobLogKey},'%')
+                </if>
+                <if test="paramDTO.getExecuteBeginTime() != null and paramDTO.getExecuteBeginTime() != ''
+                        and paramDTO.getExecuteEndTime() != null and paramDTO.getExecuteEndTime() != ''">
+                    and (#{paramDTO.executeEndTime} >= execute_time and execute_time >= #{paramDTO.executeBeginTime})
+                </if>
+            </where>
+        </if>
+        order by execute_time desc
+    </select>
+</mapper>

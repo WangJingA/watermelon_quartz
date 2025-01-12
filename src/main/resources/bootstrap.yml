@@ -1,0 +1,22 @@
+spring:
+  application:
+    name: watermelon-quartz-service
+  cloud:
+    # 配置gateway
+    # 路由规则
+    nacos:
+      discovery:
+        server-addr:  192.168.85.128:8848
+        username: nacos
+        password: nacos
+        group: DEFAULT_GROUP
+      config:
+        server-addr: 192.168.85.128:8848
+        username: nacos
+        password: nacos
+        file-extension: yml
+        import-check:
+          enabled: false
+
+
+
